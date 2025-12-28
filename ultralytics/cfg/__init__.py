@@ -52,7 +52,7 @@ SOLUTION_MAP = {
 }
 
 # Define valid tasks and modes
-MODES = frozenset({"train", "val", "predict", "export", "track", "benchmark"})
+MODES = frozenset({"train", "val", "predict", "export", "track", "benchmark", "prune"})
 TASKS = frozenset({"detect", "segment", "classify", "pose", "obb"})
 TASK2DATA = {
     "detect": "coco8.yaml",
@@ -129,10 +129,13 @@ CLI_HELP_MSG = f"""
     4. Export a YOLO11n classification model to ONNX format at image size 224 by 128 (no TASK required)
         yolo export model=yolo11n-cls.pt format=onnx imgsz=224,128
 
-    5. Ultralytics solutions usage
+    5. Prune a model with global L1 unstructured pruning
+        yolo prune model=yolo11n.pt prune_method=l1_unstructured prune_amount=0.5
+
+    6. Ultralytics solutions usage
         yolo solutions count or any of {list(SOLUTION_MAP.keys())[1:-1]} source="path/to/video.mp4"
 
-    6. Run special commands:
+    7. Run special commands:
         yolo help
         yolo checks
         yolo version
@@ -186,6 +189,7 @@ CFG_FRACTION_KEYS = frozenset(
         "conf",
         "iou",
         "fraction",
+        "prune_amount",
     }
 )
 CFG_INT_KEYS = frozenset(
@@ -201,6 +205,8 @@ CFG_INT_KEYS = frozenset(
         "line_width",
         "nbs",
         "save_period",
+        "prune_n",
+        "prune_dim",
     }
 )
 CFG_BOOL_KEYS = frozenset(
@@ -238,6 +244,8 @@ CFG_BOOL_KEYS = frozenset(
         "nms",
         "profile",
         "multi_scale",
+        "prune_global",
+        "prune_remove",
     }
 )
 
@@ -980,6 +988,12 @@ def entrypoint(debug: str = "") -> None:
         if "format" not in overrides:
             overrides["format"] = DEFAULT_CFG.format or "torchscript"
             LOGGER.warning(f"'format' argument is missing. Using default 'format={overrides['format']}'.")
+    elif mode == "prune":
+        if "prune_method" not in overrides:
+            overrides["prune_method"] = DEFAULT_CFG.prune_method or "l1_unstructured"
+            LOGGER.warning(
+                f"'prune_method' argument is missing. Using default 'prune_method={overrides['prune_method']}'."
+            )
 
     # Run command in python
     getattr(model, mode)(**overrides)  # default args from model
