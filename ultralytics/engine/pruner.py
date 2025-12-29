@@ -142,12 +142,15 @@ class Pruner:
 
     def _apply_modelopt_pruning(self, model: torch.nn.Module) -> None:
         try:
-            import importlib
-
-            pruning = importlib.import_module("modelopt.torch.pruning")
+            pruning = self._resolve_modelopt_module()
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
                 "NVIDIA ModelOpt is not installed. Install with `pip install nvidia-modelopt`."
+            ) from exc
+        except ImportError as exc:
+            raise ImportError(
+                "Unable to locate ModelOpt pruning module. "
+                "Update ModelOpt or set prune_modelopt_config for your installed version."
             ) from exc
 
         config = self._resolve_modelopt_config()
@@ -165,6 +168,26 @@ class Pruner:
                 prune_model(model, **config)
             else:
                 raise
+
+    @staticmethod
+    def _resolve_modelopt_module():
+        import importlib
+
+        candidates = [
+            "modelopt.torch.pruning",
+            "modelopt.torch.prune",
+            "modelopt.torch.prune.pruning",
+            "modelopt.torch.sparsity",
+            "modelopt.torch.nn.pruning",
+        ]
+        for module in candidates:
+            try:
+                mod = importlib.import_module(module)
+            except ModuleNotFoundError:
+                continue
+            if hasattr(mod, "prune_model"):
+                return mod
+        raise ImportError("No compatible ModelOpt pruning module found.")
 
     def _resolve_modelopt_config(self) -> dict | None:
         config = self.args.prune_modelopt_config
