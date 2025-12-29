@@ -62,6 +62,7 @@ class Model(torch.nn.Module):
         val: Validate the model on a dataset.
         benchmark: Benchmark the model on various export formats.
         export: Export the model to different formats.
+        prune: Prune model weights using a unified pruning interface.
         train: Train the model on a dataset.
         tune: Perform hyperparameter tuning.
         _apply: Apply a function to the model's tensors.
@@ -707,6 +708,44 @@ class Model(torch.nn.Module):
         }  # method defaults
         args = {**self.overrides, **custom, **kwargs, "mode": "export"}  # highest priority args on the right
         return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)
+
+    def prune(self, **kwargs: Any) -> str:
+        """Prune model weights and save the pruned checkpoint.
+
+        This method applies structured or unstructured pruning to the model using a unified interface, similar to
+        export. It supports global and per-layer pruning strategies based on the provided arguments.
+
+        Args:
+            **kwargs (Any): Arbitrary keyword arguments for pruning configuration. Common options include:
+                - prune_method (str): Pruning method (l1_unstructured, random_unstructured, lamp_unstructured, ln_structured, nvidia_modelopt).
+                - prune_amount (float): Fraction of weights to prune.
+                - prune_global (bool): Apply pruning globally across layers.
+                - prune_n (int): Parameters to prune at a time for ln_structured.
+                - prune_dim (int): Dimension to prune for ln_structured.
+                - prune_remove (bool): Remove pruning reparametrizations after pruning.
+                - prune_modelopt_config (str | dict): NVIDIA ModelOpt config (dict or path to YAML/JSON).
+
+        Returns:
+            (str): The path to the pruned model file.
+
+        Raises:
+            AssertionError: If the model is not a PyTorch model.
+            ValueError: If invalid pruning options are specified.
+
+        Examples:
+            >>> model = YOLO("yolo11n.pt")
+            >>> model.prune(prune_method="l1_unstructured", prune_amount=0.5)
+            'path/to/pruned.pt'
+        """
+        self._check_is_pytorch_model()
+        from .pruner import Pruner
+
+        custom = {
+            "device": None,
+            "verbose": False,
+        }
+        args = {**self.overrides, **custom, **kwargs, "mode": "prune"}
+        return Pruner(overrides=args, _callbacks=self.callbacks)(model=self.model)
 
     def train(
         self,
