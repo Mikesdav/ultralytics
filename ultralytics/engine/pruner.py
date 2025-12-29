@@ -158,9 +158,9 @@ class Pruner:
             raise ValueError(
                 "prune_modelopt_config is required for nvidia_modelopt. Provide a dict or path to YAML/JSON."
             )
-        prune_model = getattr(pruning, "prune_model", None)
+        prune_model = self._resolve_modelopt_entry(pruning)
         if prune_model is None:
-            raise AttributeError("modelopt.torch.pruning.prune_model is required for nvidia_modelopt.")
+            raise AttributeError("No compatible ModelOpt pruning entrypoint found.")
         try:
             prune_model(model, config)
         except TypeError:
@@ -185,9 +185,16 @@ class Pruner:
                 mod = importlib.import_module(module)
             except ModuleNotFoundError:
                 continue
-            if hasattr(mod, "prune_model"):
-                return mod
+            return mod
         raise ImportError("No compatible ModelOpt pruning module found.")
+
+    @staticmethod
+    def _resolve_modelopt_entry(module):
+        for name in ("prune_model", "prune", "apply_pruning", "apply_prune"):
+            entry = getattr(module, name, None)
+            if callable(entry):
+                return entry
+        return None
 
     def _resolve_modelopt_config(self) -> dict | None:
         config = self.args.prune_modelopt_config
