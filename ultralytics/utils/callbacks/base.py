@@ -141,6 +141,19 @@ def on_export_end(exporter):
     pass
 
 
+# Pruner callbacks -----------------------------------------------------------------------------------------------------
+
+
+def on_prune_start(pruner):
+    """Called when the model pruning starts."""
+    pass
+
+
+def on_prune_end(pruner):
+    """Called when the model pruning ends."""
+    pass
+
+
 default_callbacks = {
     # Run in trainer
     "on_pretrain_routine_start": [on_pretrain_routine_start],
@@ -171,6 +184,9 @@ default_callbacks = {
     # Run in exporter
     "on_export_start": [on_export_start],
     "on_export_end": [on_export_end],
+    # Run in pruner
+    "on_prune_start": [on_prune_start],
+    "on_prune_end": [on_prune_end],
 }
 
 
