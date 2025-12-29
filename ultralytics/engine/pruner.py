@@ -11,13 +11,13 @@ from torch.nn.utils import prune
 
 from ultralytics import __version__
 from ultralytics.cfg import get_cfg, get_save_dir
-from ultralytics.utils import LOGGER, callbacks
+from ultralytics.utils import DEFAULT_CFG, LOGGER, YAML, callbacks
 
 
 class Pruner:
     """A class for pruning YOLO models with a unified interface."""
 
-    def __init__(self, cfg, overrides=None, _callbacks=None):
+    def __init__(self, cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
         self.args = get_cfg(cfg, overrides)
         self.callbacks = _callbacks or callbacks.get_default_callbacks()
         callbacks.add_integration_callbacks(self)
@@ -48,12 +48,14 @@ class Pruner:
             if not self.args.prune_global:
                 raise ValueError("lamp_unstructured requires prune_global=True.")
             self._apply_lamp_unstructured(parameters, amount)
+        elif method == "nvidia_modelopt":
+            self._apply_modelopt_pruning(pruned_model)
         elif method == "ln_structured":
             self._apply_ln_structured(pruned_model, parameters, amount)
         else:
             raise ValueError(
                 f"Invalid prune_method='{self.args.prune_method}'. "
-                "Valid options are l1_unstructured, random_unstructured, lamp_unstructured, ln_structured."
+                "Valid options are l1_unstructured, random_unstructured, lamp_unstructured, ln_structured, nvidia_modelopt."
             )
 
         if self.args.prune_remove:
@@ -137,6 +139,44 @@ class Pruner:
                     continue
                 mask = (score > threshold).to(device=device).view(shape)
                 prune.custom_from_mask(module, name, mask)
+
+    def _apply_modelopt_pruning(self, model: torch.nn.Module) -> None:
+        try:
+            import importlib
+
+            pruning = importlib.import_module("modelopt.torch.pruning")
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "NVIDIA ModelOpt is not installed. Install with `pip install nvidia-modelopt`."
+            ) from exc
+
+        config = self._resolve_modelopt_config()
+        if config is None:
+            raise ValueError(
+                "prune_modelopt_config is required for nvidia_modelopt. Provide a dict or path to YAML/JSON."
+            )
+        prune_model = getattr(pruning, "prune_model", None)
+        if prune_model is None:
+            raise AttributeError("modelopt.torch.pruning.prune_model is required for nvidia_modelopt.")
+        try:
+            prune_model(model, config)
+        except TypeError:
+            if isinstance(config, dict):
+                prune_model(model, **config)
+            else:
+                raise
+
+    def _resolve_modelopt_config(self) -> dict | None:
+        config = self.args.prune_modelopt_config
+        if config is None:
+            return None
+        if isinstance(config, dict):
+            return config
+        if isinstance(config, str) and config:
+            path = Path(config)
+            if path.suffix.lower() in {".yaml", ".yml", ".json"} and path.exists():
+                return YAML.load(path)
+        raise ValueError("prune_modelopt_config must be a dict or path to an existing YAML/JSON file.")
 
     @staticmethod
     def _remove_reparametrization(model: torch.nn.Module) -> None:

@@ -717,12 +717,13 @@ class Model(torch.nn.Module):
 
         Args:
             **kwargs (Any): Arbitrary keyword arguments for pruning configuration. Common options include:
-                - prune_method (str): Pruning method (l1_unstructured, random_unstructured, lamp_unstructured, ln_structured).
+                - prune_method (str): Pruning method (l1_unstructured, random_unstructured, lamp_unstructured, ln_structured, nvidia_modelopt).
                 - prune_amount (float): Fraction of weights to prune.
                 - prune_global (bool): Apply pruning globally across layers.
                 - prune_n (int): Parameters to prune at a time for ln_structured.
                 - prune_dim (int): Dimension to prune for ln_structured.
                 - prune_remove (bool): Remove pruning reparametrizations after pruning.
+                - prune_modelopt_config (str | dict): NVIDIA ModelOpt config (dict or path to YAML/JSON).
 
         Returns:
             (str): The path to the pruned model file.

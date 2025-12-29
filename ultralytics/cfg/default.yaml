@@ -89,6 +89,16 @@ simplify: True # (bool) ONNX/engine only; run graph simplifier for cleaner ONNX 
 opset: # (int, optional) ONNX/engine only; opset version for export; leave unset to use a tested default
 workspace: # (float, optional) engine (TensorRT) only; workspace size in GiB, e.g. 4
 nms: False # (bool) fuse NMS into exported model when backend supports; if True, conf/iou apply (agnostic_nms except coreml)
+metadata: True # (bool | dict | None) include metadata in exports; set None/False to disable
+
+# Pruning settings -----------------------------------------------------------------------------------------------------
+prune_method: l1_unstructured # (str) pruning method: l1_unstructured|random_unstructured|lamp_unstructured|ln_structured|nvidia_modelopt
+prune_amount: 0.5 # (float) fraction of weights to prune (0.0 to 1.0)
+prune_global: True # (bool) apply pruning globally across layers
+prune_n: 2 # (int) number of parameters to prune at a time for ln_structured
+prune_dim: 0 # (int) dimension to prune for ln_structured
+prune_remove: False # (bool) permanently remove pruning reparametrizations
+prune_modelopt_config: # (str | dict, optional) NVIDIA ModelOpt config (dict or path to YAML/JSON)
 
 # Pruning settings -----------------------------------------------------------------------------------------------------
 prune_method: l1_unstructured # (str) pruning method: l1_unstructured|random_unstructured|lamp_unstructured|ln_structured

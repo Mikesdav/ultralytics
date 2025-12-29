@@ -158,7 +158,7 @@ def export_formats():
             ".engine",
             False,
             True,
-            ["batch", "dynamic", "half", "int8", "simplify", "nms", "fraction"],
+            ["batch", "dynamic", "half", "int8", "simplify", "nms", "fraction", "metadata"],
         ],
         ["CoreML", "coreml", ".mlpackage", True, False, ["batch", "dynamic", "half", "int8", "nms"]],
         ["TensorFlow SavedModel", "saved_model", "_saved_model", True, True, ["batch", "int8", "keras", "nms"]],
@@ -528,7 +528,7 @@ class Exporter:
         self.pretty_name = Path(self.model.yaml.get("yaml_file", self.file)).stem.replace("yolo", "YOLO")
         data = model.args["data"] if hasattr(model, "args") and isinstance(model.args, dict) else ""
         description = f"Ultralytics {self.pretty_name} model {f'trained on {data}' if data else ''}"
-        self.metadata = {
+        metadata = {
             "description": description,
             "author": "Ultralytics",
             "date": datetime.now().isoformat(),
@@ -543,12 +543,18 @@ class Exporter:
             "args": {k: v for k, v in self.args if k in fmt_keys},
             "channels": model.yaml.get("channels", 3),
         }  # model metadata
-        if dla is not None:
-            self.metadata["dla"] = dla  # make sure `AutoBackend` uses correct dla device if it has one
-        if model.task == "pose":
-            self.metadata["kpt_shape"] = model.model[-1].kpt_shape
-            if hasattr(model, "kpt_names"):
-                self.metadata["kpt_names"] = model.kpt_names
+        if self.args.metadata not in {None, False}:
+            if isinstance(self.args.metadata, dict):
+                metadata.update(self.args.metadata)
+            if dla is not None:
+                metadata["dla"] = dla  # make sure `AutoBackend` uses correct dla device if it has one
+            if model.task == "pose":
+                metadata["kpt_shape"] = model.model[-1].kpt_shape
+                if hasattr(model, "kpt_names"):
+                    metadata["kpt_names"] = model.kpt_names
+            self.metadata = metadata
+        else:
+            self.metadata = None
 
         LOGGER.info(
             f"\n{colorstr('PyTorch:')} starting from '{file}' with input shape {tuple(im.shape)} BCHW and "
@@ -715,9 +721,10 @@ class Exporter:
                 LOGGER.warning(f"{prefix} simplifier failure: {e}")
 
         # Metadata
-        for k, v in self.metadata.items():
-            meta = model_onnx.metadata_props.add()
-            meta.key, meta.value = k, str(v)
+        if self.metadata:
+            for k, v in self.metadata.items():
+                meta = model_onnx.metadata_props.add()
+                meta.key, meta.value = k, str(v)
 
         # IR version
         if getattr(model_onnx, "ir_version", 0) > 10:
@@ -1015,7 +1022,7 @@ class Exporter:
             self.im.shape,
             dla=dla,
             dataset=self.get_int8_calibration_dataloader(prefix) if self.args.int8 else None,
-            metadata=self.metadata,
+            metadata=self.metadata if self.args.metadata not in {None, False} else None,
             verbose=self.args.verbose,
             prefix=prefix,
         )
